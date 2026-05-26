@@ -12,6 +12,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 import textwrap
+import dataclasses
 from datetime import datetime
 
 from h2_core import (
@@ -792,184 +793,64 @@ with tab_ely:
         eta_lhv_pct=ely_eta,
     )
 
-with tab_proc:
-    # ── Step-Selektor (Flowchart-Navigation) ─────────────────
-    if 'proc_step' not in st.session_state:
-        st.session_state.proc_step = 'comp'
-    _sel_inp = st.session_state.proc_step
-    _lh2_on  = st.session_state.get('liq_on', False)
+# ── proc_step initialisieren ──────────────────────────────────────────────────
+if 'proc_step' not in st.session_state:
+    st.session_state.proc_step = 'comp'
 
-    def _fn(key, icon, label, cost='', is_lh2=False):
-        sel_cls = ' sel' if (_sel_inp == key) else ''
-        lh2_cls = ' lh2' if is_lh2 else ''
-        dim_cls = ' dim' if (is_lh2 and not _lh2_on) else ''
-        cost_html = f'<span class="fc">{cost}</span>' if cost else ''
-        return (f'<td class="fn{sel_cls}{lh2_cls}{dim_cls}">'
-                f'<span class="fi">{icon}</span>'
-                f'<span class="fl">{label}</span>'
-                f'{cost_html}</td>')
+# ── ProcInputs aus session_state (Widgets werden im Prozessketten-Tab definiert)
+# Defensive Konstruktion: Falls h2_core.py auf dem Deployment-Server eine ältere
+# Version ist (in der ProcInputs nicht alle untenstehenden Felder kennt), werden
+# unbekannte kwargs automatisch herausgefiltert, damit der Aufruf keinen TypeError
+# wirft. Stattdessen wird eine Warnung in der Sidebar/im UI ausgegeben.
+_proc_kwargs = dict(
+    p1_bar               = st.session_state.get('comp_p1',    30.0),
+    p2_bar               = st.session_state.get('comp_p2',    350.0),
+    comp_eta             = st.session_state.get('comp_eta',   scn['compEta'] / 100),
+    comp_capex_eur_kgh   = st.session_state.get('comp_capex', int(scn['compCAPEX'])),
+    comp_opex_pct        = st.session_state.get('comp_opex',  float(scn['compOPEX'])),
+    comp_life_a          = st.session_state.get('comp_life',  int(scn['compLife'])),
+    comp_loss_pct        = st.session_state.get('comp_loss',  1.0),
+    comp_util_target_pct = st.session_state.get('comp_util',  70.0),
+    stor_days            = st.session_state.get('stor_days',  2.0),
+    stor_capex_eur_kg    = st.session_state.get('stor_capex', int(scn['storCAPEX'])),
+    stor_opex_pct        = st.session_state.get('stor_opex',  float(scn['storOPEX'])),
+    stor_life_a          = st.session_state.get('stor_life',  int(scn['storLife'])),
+    gh2_buf_days         = st.session_state.get('gh2_buf_days',  1.0),
+    gh2_buf_capex_eur_kg = st.session_state.get('gh2_buf_capex', 300),
+    gh2_buf_opex_pct     = float(scn.get('gh2BufOPEX', 2.0)),
+    gh2_buf_life_a       = float(scn.get('gh2BufLife', 20)),
+    disp_util_pct        = st.session_state.get('disp_util',  float(scn['dispUtil'])),
+    disp_opex_pct        = st.session_state.get('disp_opex',  float(scn['dispOPEX'])),
+    disp_life_a          = st.session_state.get('disp_life',  int(scn['dispLife'])),
+    disp_loss_pct        = st.session_state.get('disp_loss',  2.0),
+    liq_on               = st.session_state.get('liq_on',     False),
+    liq_sec_kwh_kg       = st.session_state.get('liq_sec',    float(scn.get('liqSEC', 13.0))),
+    liq_capex_eur_kgh    = st.session_state.get('liq_capex',  int(scn.get('liqCAPEX', 130_000))),
+    liq_opex_pct         = st.session_state.get('liq_opex',   float(scn.get('liqOPEX', 4.0))),
+    liq_life_a           = st.session_state.get('liq_life',   int(scn.get('liqLife', 22))),
+    liq_util_target_pct  = st.session_state.get('liq_util',   70.0),
+    lh2_stor_days        = st.session_state.get('lh2_days',   float(scn.get('lh2Days', 0.5))),
+    lh2_boiloff_pct_per_day = st.session_state.get('lh2_boiloff', float(scn.get('lh2Boiloff', 0.20))),
+    lh2_stor_capex_eur_kg = scn.get('lh2StorCAPEX', 350),
+    lh2_stor_opex_pct     = float(scn.get('lh2StorOPEX', 2.0)),
+    lh2_stor_life_a       = scn.get('lh2StorLife', 27),
+    lh2_disp_capex_keur   = scn.get('lh2DispCAPEX', 560),
+    lh2_disp_util_pct     = scn.get('lh2DispUtil', 80),
+    lh2_disp_opex_pct     = scn.get('lh2DispOPEX', 2.5),
+    lh2_disp_life_a       = scn.get('lh2DispLife', 15),
+)
 
-    _shared_style = ('background:#111827;'
-                     'border:1px solid rgba(255,255,255,0.08);border-top:2px solid #3b82f6;border-radius:6px;'
-                     'text-align:center;padding:10px 10px;min-width:80px;vertical-align:middle;')
-
-    st.markdown(textwrap.dedent(f"""
-    <div class="flow-wrap">
-    <table class="flow-tbl">
-      <tr>
-        <td rowspan="2" style="{_shared_style}">
-          <span style="font-size:1.25rem;">⚡</span><br>
-          <span style="font-size:0.68rem;font-weight:600;color:#3b82f6;">ELY</span>
-        </td>
-        <td rowspan="2" class="fa">→</td>
-        <td rowspan="2" style="{_shared_style}">
-          <span style="font-size:1.25rem;">📦</span><br>
-          <span style="font-size:0.68rem;font-weight:600;color:#6b7280;">GH₂-Puffer</span>
-        </td>
-        <td rowspan="2" class="fb">─┬<br>&nbsp;└</td>
-        {_fn('comp','🔧','Kompressor')}
-        <td class="fa">→</td>
-        {_fn('stor','📦','CGH₂-Speicher')}
-        <td class="fa">→</td>
-        {_fn('disp','⛽','Vertankung')}
-        <td style="padding-left:6px;">
-          <span class="lane-tag" style="background:rgba(59,130,246,0.1);color:#3b82f6;border:1px solid rgba(59,130,246,0.2);">CGH₂</span>
-        </td>
-      </tr>
-      <tr>
-        {_fn('lh2','❄️','Verflüssigung',is_lh2=True)}
-        <td class="fa{'dim' if not _lh2_on else ''}">→</td>
-        {_fn('lh2','🧊','LH₂-Speicher',is_lh2=True)}
-        <td class="fa{'dim' if not _lh2_on else ''}">→</td>
-        {_fn('lh2','⛽','LH₂-Vertankung',is_lh2=True)}
-        <td style="padding-left:6px;">
-          <span class="lane-tag" style="{'opacity:0.4;' if not _lh2_on else ''}background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2);">LH₂</span>
-        </td>
-      </tr>
-    </table>
-    </div>
-    """), unsafe_allow_html=True)
-
-    # ── Klick-Buttons unter dem Flowchart ─────────────────
-    _btn_steps = [('comp','🔧 Kompressor'), ('stor','📦 Speicher'),
-                  ('disp','⛽ Vertankung'), ('lh2','❄️ LH₂-Pfad')]
-    _bcols = st.columns(len(_btn_steps))
-    for _bi, (_bk, _bl) in enumerate(_btn_steps):
-        _is_active = (_sel_inp == _bk)
-        if _bcols[_bi].button(
-            f"{'✓ ' if _is_active else ''}{_bl}",
-            key=f"flow_btn_{_bk}",
-            use_container_width=True,
-            type="primary" if _is_active else "secondary",
-        ):
-            st.session_state.proc_step = _bk
-            st.rerun()
-
-    st.markdown("---")
-
-    _sel = st.session_state.proc_step
-
-    with st.expander("🔧 Kompression", expanded=(_sel == 'comp')):
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            p1 = st.number_input("Eingangsdruck [bar]", 1.0, 100.0, 30.0, key="comp_p1")
-            p2 = st.number_input("Ausgangsdruck [bar]", 50.0, 1000.0, 350.0, key="comp_p2")
-        with c2:
-            comp_eta = st.slider("Wirkungsgrad", 0.50, 0.95, scn['compEta'] / 100, 0.01, key="comp_eta")
-            comp_capex = st.number_input("CAPEX [€/(kg/h)]", 5_000, 100_000, int(scn['compCAPEX']), key="comp_capex")
-        with c3:
-            comp_opex = st.number_input("OPEX [%/a]", 0.5, 10.0, float(scn['compOPEX']), 0.5, key="comp_opex")
-            comp_life = st.number_input("Lebensdauer [a]", 5, 30, int(scn['compLife']), key="comp_life")
-            comp_loss = st.number_input("Verlust [%]", 0.0, 5.0, 1.0, 0.1, key="comp_loss")
-        with c4:
-            comp_util = st.number_input(
-                "Ziel-Auslastung Kompressor [%]", 30.0, 95.0, 70.0, 5.0,
-                key="comp_util",
-                help=(
-                    "Kompressor läuft entkoppelt vom ELY über den GH₂-Puffer @30 bar.\n\n"
-                    "Auslegung: ann_H₂ ÷ (8.760 h × Auslastung)\n"
-                    "70 % → ca. 6.130 h/a Betrieb"
-                ),
-            )
-
-    with st.expander("📦 CGH₂-Speicher", expanded=(_sel == 'stor')):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            stor_days = st.number_input("Speichertage", 0.1, 30.0, 2.0, 0.1, key="stor_days")
-            stor_capex = st.number_input("CAPEX [€/kg]", 100, 3000, int(scn['storCAPEX']), key="stor_capex")
-        with c2:
-            stor_opex = st.number_input("OPEX [%/a]", 0.5, 5.0, float(scn['storOPEX']), 0.5, key="stor_opex")
-            stor_life = st.number_input("Lebensdauer [a]", 10, 40, int(scn['storLife']), key="stor_life")
-        with c3:
-            gh2_buf_days = st.number_input("GH₂-Puffer [Tage]", 0.0, 10.0, 1.0, 0.5, key="gh2_buf_days")
-            gh2_buf_capex = st.number_input("GH₂-Puffer CAPEX [€/kg]", 100, 2000, 300, key="gh2_buf_capex")
-
-    with st.expander("⛽ Vertankung", expanded=(_sel == 'disp')):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            disp_util = st.number_input("Auslastung [%]", 20.0, 100.0, float(scn['dispUtil']), 5.0, key="disp_util")
-            disp_life = st.number_input("Lebensdauer [a]", 5, 25, int(scn['dispLife']), key="disp_life")
-        with c2:
-            disp_opex = st.number_input("OPEX [%/a]", 0.5, 5.0, float(scn['dispOPEX']), 0.5, key="disp_opex")
-            disp_loss = st.number_input("Verlust [%]", 0.0, 10.0, 2.0, 0.5, key="disp_loss")
-        with c3:
-            st.caption(f"Kapazität aus Strategie: **{strat['dispKgh']} kg/h**")
-            st.caption("CAPEX wird automatisch skaliert (Power-Law).")
-
-    with st.expander("❄️ LH₂-Pfad (Verflüssigung + LH₂-Speicher/Vertankung)", expanded=(_sel == 'lh2')):
-        liq_on = st.checkbox("LH₂-Pfad aktivieren", value=False, key="liq_on")
-        if liq_on:
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                liq_sec = st.number_input("Spez. Strom Verflüssigung [kWh/kg]", 5.0, 20.0, float(scn['liqSEC']), key="liq_sec")
-                liq_capex = st.number_input("CAPEX Verflüssigung [€/(kg/h)]", 10_000, 500_000, int(scn['liqCAPEX']), 5_000, key="liq_capex")
-            with c2:
-                liq_opex = st.number_input("OPEX Verflüssigung [%/a]", 1.0, 10.0, float(scn['liqOPEX']), key="liq_opex")
-                liq_life = st.number_input("Lebensdauer Verflüssigung [a]", 10, 30, int(scn['liqLife']), key="liq_life")
-            with c3:
-                liq_util = st.number_input(
-                    "Ziel-Auslastung Verflüssiger [%]", 30.0, 95.0, 70.0, 5.0,
-                    key="liq_util",
-                    help=(
-                        "Der Verflüssiger wird kleiner ausgelegt als der ELY-Peak, "
-                        "weil er über den GH₂-Puffer kontinuierlicher läuft.\n\n"
-                        "Auslegung: ann_H₂ ÷ (8.760 h × Auslastung)\n"
-                        "70 % → ca. 6.130 h/a Betrieb"
-                    ),
-                )
-                lh2_days = st.number_input("LH₂-Speichertage", 0.5, 15.0, float(scn['lh2Days']), key="lh2_days")
-                lh2_boiloff = st.number_input("Boil-off [%/Tag]", 0.01, 1.0, float(scn['lh2Boiloff']), 0.05, key="lh2_boiloff")
-        else:
-            liq_sec = 13.0
-            liq_capex = scn.get('liqCAPEX', 130_000)
-            liq_opex = scn.get('liqOPEX', 4.0)
-            liq_life = scn.get('liqLife', 22)
-            liq_util = 70.0
-            lh2_days = scn.get('lh2Days', 0.5)
-            lh2_boiloff = scn.get('lh2Boiloff', 0.20)
-
-    proc = ProcInputs(
-        p1_bar=p1, p2_bar=p2, comp_eta=comp_eta,
-        comp_capex_eur_kgh=comp_capex, comp_opex_pct=comp_opex, comp_life_a=comp_life,
-        comp_loss_pct=comp_loss, comp_util_target_pct=comp_util,
-        stor_days=stor_days, stor_capex_eur_kg=stor_capex, stor_opex_pct=stor_opex,
-        stor_life_a=stor_life,
-        gh2_buf_days=gh2_buf_days, gh2_buf_capex_eur_kg=gh2_buf_capex,
-        gh2_buf_opex_pct=float(scn.get('gh2BufOPEX', 2.0)),
-        gh2_buf_life_a=float(scn.get('gh2BufLife', 20)),
-        disp_util_pct=disp_util, disp_opex_pct=disp_opex, disp_life_a=disp_life,
-        disp_loss_pct=disp_loss,
-        liq_on=liq_on, liq_sec_kwh_kg=liq_sec, liq_capex_eur_kgh=liq_capex,
-        liq_opex_pct=liq_opex, liq_life_a=liq_life, liq_util_target_pct=liq_util,
-        lh2_stor_days=lh2_days, lh2_boiloff_pct_per_day=lh2_boiloff,
-        lh2_stor_capex_eur_kg=scn.get('lh2StorCAPEX', 350),
-        lh2_stor_opex_pct=float(scn.get('lh2StorOPEX', 2.0)),
-        lh2_stor_life_a=scn.get('lh2StorLife', 27),
-        lh2_disp_capex_keur=scn.get('lh2DispCAPEX', 560),
-        lh2_disp_util_pct=scn.get('lh2DispUtil', 80),
-        lh2_disp_opex_pct=scn.get('lh2DispOPEX', 2.5),
-        lh2_disp_life_a=scn.get('lh2DispLife', 15),
+# Nur Felder durchreichen, die ProcInputs tatsächlich kennt → robust gegen
+# Versions-Desynchronisation zwischen h2_app_modified.py und h2_core.py.
+_valid_proc_fields = {f.name for f in dataclasses.fields(ProcInputs)}
+_unknown_proc_fields = set(_proc_kwargs) - _valid_proc_fields
+if _unknown_proc_fields:
+    st.warning(
+        "h2_core.py auf dem Server scheint veraltet zu sein – folgende Felder "
+        f"werden ignoriert: {sorted(_unknown_proc_fields)}. "
+        "Bitte aktuelle h2_core.py deployen."
     )
+proc = ProcInputs(**{k: v for k, v in _proc_kwargs.items() if k in _valid_proc_fields})
 
 with tab_fleet:
     st.subheader("Flotte / TCO")
@@ -1007,15 +888,12 @@ with tab_import:
                                    key="imp_trans",
                                    help="Tube-Trailer-Transport: ca. 0.3–1.0 ct/kg·km")
     with c3:
-        price_a = st.number_input("Terminalpreis A – Markt [€/kg]", 1.0, 15.0, 4.90, 0.10,
+        price_a = st.number_input("Terminalpreis [€/kg]", 1.0, 15.0, 4.90, 0.10,
                                   key="imp_price_a",
                                   help="H₂-Preis frei Importterminal (inkl. Produktion, Seefracht, NH₃-Synthese & Cracking)")
-        price_b = st.number_input("Terminalpreis B – staatl. abges. [€/kg]", 1.0, 15.0, 3.80, 0.10,
-                                  key="imp_price_b",
-                                  help="Subventionierter / staatlich abgesicherter Importpreis (z. B. H2Global-Mechanismus)")
     imp = ImportInputs(
         distance_km=dist_km, transport_ct_per_kg_km=trans_ct,
-        price_a_eur_kg=price_a, price_b_eur_kg=price_b,
+        price_a_eur_kg=price_a,
     )
 
 
@@ -1583,6 +1461,141 @@ with tab_ely:
 with tab_proc:
     st.markdown("---")
     pr = result.proc
+    _sel = st.session_state.proc_step
+    _lh2_on = proc.liq_on
+
+    # ── Flowchart mit berechneten Kostenwerten (anklickbar) ───────────
+    def _rn2(key, icon, label, cost, is_lh2=False):
+        sel_cls = ' sel' if (_sel == key) else ''
+        lh2_cls = ' lh2' if is_lh2 else ''
+        dim_cls = ' dim' if (is_lh2 and not _lh2_on) else ''
+        return (f'<td class="fn{sel_cls}{lh2_cls}{dim_cls}">'
+                f'<span class="fi">{icon}</span>'
+                f'<span class="fl">{label}</span>'
+                f'<span class="fc">{cost}</span></td>')
+
+    _shared2 = ('background:#111827;border:1px solid rgba(255,255,255,0.08);'
+                'border-top:2px solid #3b82f6;border-radius:6px;'
+                'text-align:center;padding:10px 10px;min-width:80px;vertical-align:middle;')
+
+    st.markdown(textwrap.dedent(f"""
+    <div class="flow-wrap">
+    <table class="flow-tbl">
+      <tr>
+        <td rowspan="2" style="{_shared2}">
+          <span style="font-size:1.25rem;">⚡</span><br>
+          <span style="font-size:0.68rem;font-weight:600;color:#3b82f6;">ELY</span><br>
+          <span style="font-size:0.82rem;font-weight:700;color:#3b82f6;">{result.ely.lcoh_ely:.2f} €/kg</span>
+        </td>
+        <td rowspan="2" class="fa">→</td>
+        <td rowspan="2" style="{_shared2}">
+          <span style="font-size:1.25rem;">📦</span><br>
+          <span style="font-size:0.68rem;font-weight:600;color:#94a3b8;">GH₂-Puffer</span><br>
+          <span style="font-size:0.75rem;color:#64748b;">{pr.mfr_ely_peak:.0f} kg/h</span>
+        </td>
+        <td rowspan="2" class="fb">─┬<br>&nbsp;└</td>
+        {_rn2('comp','🔧','Kompressor',f'{pr.comp:.3f} €/kg')}
+        <td class="fa">→</td>
+        {_rn2('stor','📦','CGH₂-Speicher',f'{pr.stor:.3f} €/kg')}
+        <td class="fa">→</td>
+        {_rn2('disp','⛽','Vertankung',f'{pr.disp:.3f} €/kg')}
+        <td style="padding-left:6px;">
+          <span class="lane-tag" style="background:rgba(59,130,246,0.1);color:#3b82f6;border:1px solid rgba(59,130,246,0.2);">CGH₂<br><small style="font-size:0.75em;">{result.lcoh_total_cgh2:.2f} €/kg</small></span>
+        </td>
+      </tr>
+      <tr>
+        {_rn2('lh2','❄️','Verflüssigung',f'{pr.liq:.3f} €/kg' if _lh2_on else '—',is_lh2=True)}
+        <td class="fa">→</td>
+        {_rn2('lh2','🧊','LH₂-Speicher',f'{pr.lh2_stor:.3f} €/kg' if _lh2_on else '—',is_lh2=True)}
+        <td class="fa">→</td>
+        {_rn2('lh2','⛽','LH₂-Vertankung',f'{pr.lh2_disp:.3f} €/kg' if _lh2_on else '—',is_lh2=True)}
+        <td style="padding-left:6px;">
+          <span class="lane-tag" style="{'opacity:0.4;' if not _lh2_on else ''}background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2);">LH₂{'<br><small style=\"font-size:0.75em;\">' + f'{result.lcoh_total_lh2:.2f} €/kg</small>' if _lh2_on else ''}</span>
+        </td>
+      </tr>
+    </table>
+    </div>
+    """), unsafe_allow_html=True)
+
+    # ── Klick-Buttons (wählen welcher Schritt bearbeitet wird) ────────
+    _btn_steps = [('comp','🔧 Kompressor'), ('stor','📦 Speicher'),
+                  ('disp','⛽ Vertankung'), ('lh2','❄️ LH₂-Pfad')]
+    _bcols = st.columns(len(_btn_steps))
+    for _bi, (_bk, _bl) in enumerate(_btn_steps):
+        _is_active = (_sel == _bk)
+        if _bcols[_bi].button(
+            f"{'✓ ' if _is_active else ''}{_bl}",
+            key=f"flow_btn_{_bk}",
+            use_container_width=True,
+            type="primary" if _is_active else "secondary",
+        ):
+            st.session_state.proc_step = _bk
+            st.rerun()
+
+    st.markdown("---")
+
+    # ── Parameter-Expander (direkt unter Flowchart) ───────────────────
+    with st.expander("🔧 Kompression", expanded=(_sel == 'comp')):
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.number_input("Eingangsdruck [bar]", 1.0, 100.0, 30.0, key="comp_p1")
+            st.number_input("Ausgangsdruck [bar]", 50.0, 1000.0, 350.0, key="comp_p2")
+        with c2:
+            st.slider("Wirkungsgrad", 0.50, 0.95, scn['compEta'] / 100, 0.01, key="comp_eta")
+            st.number_input("CAPEX [€/(kg/h)]", 5_000, 100_000, int(scn['compCAPEX']), key="comp_capex")
+        with c3:
+            st.number_input("OPEX [%/a]", 0.5, 10.0, float(scn['compOPEX']), 0.5, key="comp_opex")
+            st.number_input("Lebensdauer [a]", 5, 30, int(scn['compLife']), key="comp_life")
+            st.number_input("Verlust [%]", 0.0, 5.0, 1.0, 0.1, key="comp_loss")
+        with c4:
+            st.number_input(
+                "Ziel-Auslastung [%]", 30.0, 95.0, 70.0, 5.0, key="comp_util",
+                help="Kompressor läuft entkoppelt vom ELY über den GH₂-Puffer @30 bar.\n\nAuslegung: ann_H₂ ÷ (8.760 h × Auslastung)\n70 % → ca. 6.130 h/a Betrieb",
+            )
+
+    with st.expander("📦 CGH₂-Speicher", expanded=(_sel == 'stor')):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.number_input("Speichertage", 0.1, 30.0, 2.0, 0.1, key="stor_days")
+            st.number_input("CAPEX [€/kg]", 100, 3000, int(scn['storCAPEX']), key="stor_capex")
+        with c2:
+            st.number_input("OPEX [%/a]", 0.5, 5.0, float(scn['storOPEX']), 0.5, key="stor_opex")
+            st.number_input("Lebensdauer [a]", 10, 40, int(scn['storLife']), key="stor_life")
+        with c3:
+            st.number_input("GH₂-Puffer [Tage]", 0.0, 10.0, 1.0, 0.5, key="gh2_buf_days")
+            st.number_input("GH₂-Puffer CAPEX [€/kg]", 100, 2000, 300, key="gh2_buf_capex")
+
+    with st.expander("⛽ Vertankung", expanded=(_sel == 'disp')):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.number_input("Auslastung [%]", 20.0, 100.0, float(scn['dispUtil']), 5.0, key="disp_util")
+            st.number_input("Lebensdauer [a]", 5, 25, int(scn['dispLife']), key="disp_life")
+        with c2:
+            st.number_input("OPEX [%/a]", 0.5, 5.0, float(scn['dispOPEX']), 0.5, key="disp_opex")
+            st.number_input("Verlust [%]", 0.0, 10.0, 2.0, 0.5, key="disp_loss")
+        with c3:
+            st.caption(f"Kapazität aus Strategie: **{strat['dispKgh']} kg/h**")
+            st.caption("CAPEX wird automatisch skaliert (Power-Law).")
+
+    with st.expander("❄️ LH₂-Pfad (Verflüssigung + LH₂-Speicher/Vertankung)", expanded=(_sel == 'lh2')):
+        st.checkbox("LH₂-Pfad aktivieren", value=False, key="liq_on")
+        if st.session_state.get('liq_on', False):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.number_input("Spez. Strom Verflüssigung [kWh/kg]", 5.0, 20.0, float(scn['liqSEC']), key="liq_sec")
+                st.number_input("CAPEX Verflüssigung [€/(kg/h)]", 10_000, 500_000, int(scn['liqCAPEX']), 5_000, key="liq_capex")
+            with c2:
+                st.number_input("OPEX Verflüssigung [%/a]", 1.0, 10.0, float(scn['liqOPEX']), key="liq_opex")
+                st.number_input("Lebensdauer Verflüssigung [a]", 10, 30, int(scn['liqLife']), key="liq_life")
+            with c3:
+                st.number_input(
+                    "Ziel-Auslastung Verflüssiger [%]", 30.0, 95.0, 70.0, 5.0, key="liq_util",
+                    help="Der Verflüssiger wird kleiner ausgelegt als der ELY-Peak.\n\nAuslegung: ann_H₂ ÷ (8.760 h × Auslastung)\n70 % → ca. 6.130 h/a Betrieb",
+                )
+                st.number_input("LH₂-Speichertage", 0.5, 15.0, float(scn['lh2Days']), key="lh2_days")
+                st.number_input("Boil-off [%/Tag]", 0.01, 1.0, float(scn['lh2Boiloff']), 0.05, key="lh2_boiloff")
+
+    st.markdown("---")
 
     # ── LCOH-Aufschlüsselung: gestapelter Balken ──────────────────
     er = result.ely
@@ -1648,61 +1661,6 @@ with tab_proc:
         unsafe_allow_html=True,
     )
     st.plotly_chart(_fig_bd, use_container_width=True)
-
-    # ── Flowchart mit Kostenwerten (Zwei-Pfad) ──
-    _ss2 = st.session_state.proc_step
-
-    def _rn(key, icon, label, cost, is_lh2=False):
-        sel_cls = ' sel' if (_ss2 == key) else ''
-        lh2_cls = ' lh2' if is_lh2 else ''
-        dim_cls = ' dim' if (is_lh2 and not proc.liq_on) else ''
-        return (f'<td class="fn{sel_cls}{lh2_cls}{dim_cls}">'
-                f'<span class="fi">{icon}</span>'
-                f'<span class="fl">{label}</span>'
-                f'<span class="fc">{cost}</span></td>')
-
-    _shared2 = ('background:#111827;'
-                'border:1px solid rgba(255,255,255,0.08);border-top:2px solid #3b82f6;border-radius:6px;'
-                'text-align:center;padding:10px 10px;min-width:80px;vertical-align:middle;')
-
-    st.markdown(textwrap.dedent(f"""
-    <div class="flow-wrap">
-    <table class="flow-tbl">
-      <tr>
-        <td rowspan="2" style="{_shared2}">
-          <span style="font-size:1.25rem;">⚡</span><br>
-          <span style="font-size:0.68rem;font-weight:600;color:#3b82f6;">ELY</span><br>
-          <span style="font-size:0.82rem;font-weight:700;color:#3b82f6;">{result.ely.lcoh_ely:.2f} €/kg</span>
-        </td>
-        <td rowspan="2" class="fa">→</td>
-        <td rowspan="2" style="{_shared2}">
-          <span style="font-size:1.25rem;">📦</span><br>
-          <span style="font-size:0.68rem;font-weight:600;color:#94a3b8;">GH₂-Puffer</span><br>
-          <span style="font-size:0.75rem;color:#64748b;">{pr.mfr_ely_peak:.0f} kg/h</span>
-        </td>
-        <td rowspan="2" class="fb">─┬<br>&nbsp;└</td>
-        {_rn('comp','🔧','Kompressor',f'{pr.comp:.3f} €/kg')}
-        <td class="fa">→</td>
-        {_rn('stor','📦','CGH₂-Speicher',f'{pr.stor:.3f} €/kg')}
-        <td class="fa">→</td>
-        {_rn('disp','⛽','Vertankung',f'{pr.disp:.3f} €/kg')}
-        <td style="padding-left:6px;">
-          <span class="lane-tag" style="background:rgba(59,130,246,0.1);color:#3b82f6;border:1px solid rgba(59,130,246,0.2);">CGH₂<br><small style="font-size:0.75em;">{result.lcoh_total_cgh2:.2f} €/kg</small></span>
-        </td>
-      </tr>
-      <tr>
-        {_rn('lh2','❄️','Verflüssigung',f'{pr.liq:.3f} €/kg' if proc.liq_on else '—',is_lh2=True)}
-        <td class="fa">→</td>
-        {_rn('lh2','🧊','LH₂-Speicher',f'{pr.lh2_stor:.3f} €/kg' if proc.liq_on else '—',is_lh2=True)}
-        <td class="fa">→</td>
-        {_rn('lh2','⛽','LH₂-Vertankung',f'{pr.lh2_disp:.3f} €/kg' if proc.liq_on else '—',is_lh2=True)}
-        <td style="padding-left:6px;">
-          <span class="lane-tag" style="{'opacity:0.4;' if not proc.liq_on else ''}background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.2);">LH₂{'<br><small style=\"font-size:0.75em;\">' + f'{result.lcoh_total_lh2:.2f} €/kg</small>' if proc.liq_on else ''}</span>
-        </td>
-      </tr>
-    </table>
-    </div>
-    """), unsafe_allow_html=True)
 
     st.markdown("---")
     c1, c2, c3 = st.columns(3)
@@ -1789,13 +1747,11 @@ with tab_import:
         "Der ausgewiesene Transport ist der **Lkw-Transport Hafen → Verbraucher**.",
         icon="ℹ️",
     )
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     c1.metric("🚚 Transport Hafen→Verbraucher", f"{ir['transport_eur_kg']:.2f} €/kg",
               f"{ir['distance_km']:.0f} km Lkw (Tube-Trailer)")
-    c2.metric("🚢 Import A (Markt)",     f"{ir['total_a_eur_kg']:.2f} €/kg",
+    c2.metric("🚢 Import (Markt)", f"{ir['total_a_eur_kg']:.2f} €/kg",
               f"Terminal {ir['price_a']:.2f} €/kg + Transport")
-    c3.metric("🚢 Import B (de-risked)", f"{ir['total_b_eur_kg']:.2f} €/kg",
-              f"Terminal {ir['price_b']:.2f} €/kg + Transport")
 
     st.markdown("---")
 
