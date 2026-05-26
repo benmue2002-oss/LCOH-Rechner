@@ -320,6 +320,9 @@ class ProcInputs:
     liq_opex_pct: float = 4.0
     liq_life_a: float = 22
     liq_loss_pct: float = 1.0
+    # Verflüssiger-Auslastungsziel: Anlage läuft länger als ELY (über GH₂-Puffer gepuffert)
+    # liq_mfr = ann_h2_kg / (8760 h × liq_util_pct/100)  → kleinere, besser ausgelastete Anlage
+    liq_util_target_pct: float = 70.0
     # LH₂-Speicher
     lh2_stor_days: float = 2.5
     lh2_stor_capex_eur_kg: float = 350
@@ -396,7 +399,8 @@ class ProcResult:
     lh2_total: float
     total_cgh2: float     # comp + stor + disp
     comp_energy_kwh_kg: float
-    mfr_kgh: float
+    mfr_kgh: float        # ELY-Nennmassenstrom (Kompressor-Auslegung)
+    liq_mfr_kgh: float    # Verflüssiger-Auslegungsmassenstrom (auf Auslastungsziel skaliert)
 
 
 # =====================================================================
@@ -512,9 +516,13 @@ def compute_proc_chain(proc: ProcInputs, ely_in: ElyInputs,
     gh2_buf_total = (gh2_buf_ann_cap + gh2_buf_ann_op) / max(ann_h, 1e-9)
 
     # ── Verflüssigung ──────────────────────────────────────────────
+    # Verflüssiger läuft entkoppelt vom ELY (GH₂-Puffer dazwischen).
+    # Auslegung nach Ziel-Auslastung: liq_mfr = ann_h2 / (8760 h × util_target)
+    # → kleinere, besser ausgelastete Anlage bei niedrigen ELY-FLH.
+    liq_mfr_kgh = ann_h / max(8760.0 * proc.liq_util_target_pct / 100.0, 1e-9)
     e_l = proc.liq_sec_kwh_kg * blended
-    ann_cap_l = (mfr_kgh * proc.liq_capex_eur_kgh) * crf(wacc, proc.liq_life_a)
-    ann_opx_l = (mfr_kgh * proc.liq_capex_eur_kgh) * (proc.liq_opex_pct / 100)
+    ann_cap_l = (liq_mfr_kgh * proc.liq_capex_eur_kgh) * crf(wacc, proc.liq_life_a)
+    ann_opx_l = (liq_mfr_kgh * proc.liq_capex_eur_kgh) * (proc.liq_opex_pct / 100)
     liq_loss_cost = (proc.liq_loss_pct / 100) * blended * LHV
     liq = (e_l + (ann_cap_l + ann_opx_l) / ann_h + liq_loss_cost) if proc.liq_on else 0.0
 
@@ -554,7 +562,7 @@ def compute_proc_chain(proc: ProcInputs, ely_in: ElyInputs,
         liq=liq, gh2_buf_cgh2=gh2_buf_cgh2, gh2_buf_lh2=gh2_buf_lh2,
         lh2_stor=lh2_stor, lh2_disp=lh2_disp, lh2_total=lh2_total,
         total_cgh2=total_cgh2,
-        comp_energy_kwh_kg=e_comp, mfr_kgh=mfr_kgh,
+        comp_energy_kwh_kg=e_comp, mfr_kgh=mfr_kgh, liq_mfr_kgh=liq_mfr_kgh,
     )
 
 

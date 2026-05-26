@@ -917,6 +917,16 @@ with tab_proc:
                 liq_opex = st.number_input("OPEX Verflüssigung [%/a]", 1.0, 10.0, float(scn['liqOPEX']), key="liq_opex")
                 liq_life = st.number_input("Lebensdauer Verflüssigung [a]", 10, 30, int(scn['liqLife']), key="liq_life")
             with c3:
+                liq_util = st.number_input(
+                    "Ziel-Auslastung Verflüssiger [%]", 30.0, 95.0, 70.0, 5.0,
+                    key="liq_util",
+                    help=(
+                        "Der Verflüssiger wird kleiner ausgelegt als der ELY-Peak, "
+                        "weil er über den GH₂-Puffer kontinuierlicher läuft.\n\n"
+                        "Auslegung: ann_H₂ ÷ (8.760 h × Auslastung)\n"
+                        "70 % → ca. 6.130 h/a Betrieb"
+                    ),
+                )
                 lh2_days = st.number_input("LH₂-Speichertage", 0.5, 15.0, float(scn['lh2Days']), key="lh2_days")
                 lh2_boiloff = st.number_input("Boil-off [%/Tag]", 0.01, 1.0, float(scn['lh2Boiloff']), 0.05, key="lh2_boiloff")
         else:
@@ -924,6 +934,7 @@ with tab_proc:
             liq_capex = scn.get('liqCAPEX', 130_000)
             liq_opex = scn.get('liqOPEX', 4.0)
             liq_life = scn.get('liqLife', 22)
+            liq_util = 70.0
             lh2_days = scn.get('lh2Days', 0.5)
             lh2_boiloff = scn.get('lh2Boiloff', 0.20)
 
@@ -939,7 +950,7 @@ with tab_proc:
         disp_util_pct=disp_util, disp_opex_pct=disp_opex, disp_life_a=disp_life,
         disp_loss_pct=disp_loss,
         liq_on=liq_on, liq_sec_kwh_kg=liq_sec, liq_capex_eur_kgh=liq_capex,
-        liq_opex_pct=liq_opex, liq_life_a=liq_life,
+        liq_opex_pct=liq_opex, liq_life_a=liq_life, liq_util_target_pct=liq_util,
         lh2_stor_days=lh2_days, lh2_boiloff_pct_per_day=lh2_boiloff,
         lh2_stor_capex_eur_kg=scn.get('lh2StorCAPEX', 350),
         lh2_stor_opex_pct=float(scn.get('lh2StorOPEX', 2.0)),
@@ -980,12 +991,18 @@ with tab_import:
     st.subheader("Import-Vergleich (NH₃-Route)")
     c1, c2, c3 = st.columns(3)
     with c1:
-        dist_km = st.number_input("Entfernung Hafen→Verbraucher [km]", 0, 3000, 450, 50, key="imp_dist")
+        dist_km = st.number_input("Lkw-Distanz Hafen→Verbraucher [km]", 0, 3000, 450, 50, key="imp_dist")
     with c2:
-        trans_ct = st.number_input("Transport [ct/kg·km]", 0.0, 5.0, 0.667, 0.05, key="imp_trans")
+        trans_ct = st.number_input("Lkw-Transport Hafen→Verbraucher [ct/kg·km]", 0.0, 5.0, 0.667, 0.05,
+                                   key="imp_trans",
+                                   help="Tube-Trailer-Transport: ca. 0.3–1.0 ct/kg·km")
     with c3:
-        price_a = st.number_input("Marktpreis A [€/kg]", 1.0, 15.0, 4.90, 0.10, key="imp_price_a")
-        price_b = st.number_input("Staatl. abges. B [€/kg]", 1.0, 15.0, 3.80, 0.10, key="imp_price_b")
+        price_a = st.number_input("Terminalpreis A – Markt [€/kg]", 1.0, 15.0, 4.90, 0.10,
+                                  key="imp_price_a",
+                                  help="H₂-Preis frei Importterminal (inkl. Produktion, Seefracht, NH₃-Synthese & Cracking)")
+        price_b = st.number_input("Terminalpreis B – staatl. abges. [€/kg]", 1.0, 15.0, 3.80, 0.10,
+                                  key="imp_price_b",
+                                  help="Subventionierter / staatlich abgesicherter Importpreis (z. B. H2Global-Mechanismus)")
     imp = ImportInputs(
         distance_km=dist_km, transport_ct_per_kg_km=trans_ct,
         price_a_eur_kg=price_a, price_b_eur_kg=price_b,
@@ -1625,6 +1642,13 @@ with tab_proc:
         c2.metric("LH₂-Speicher", f"{pr.lh2_stor:.3f} €/kg")
         c3.metric("LH₂-Vertankung", f"{pr.lh2_disp:.3f} €/kg")
         st.metric("LH₂-Pfad gesamt", f"{pr.lh2_total:.3f} €/kg")
+        _liq_capex_total = pr.liq_mfr_kgh * proc.liq_capex_eur_kgh / 1_000_000
+        st.caption(
+            f"Verflüssiger-Auslegung: **{pr.liq_mfr_kgh:.1f} kg/h** "
+            f"({proc.liq_util_target_pct:.0f} % Zielauslastung · {8760 * proc.liq_util_target_pct / 100:.0f} h/a) · "
+            f"CAPEX-Anlage: **{_liq_capex_total:.2f} Mio. €** · "
+            f"ELY-Nennstrom zum Vergleich: {pr.mfr_kgh:.1f} kg/h"
+        )
 
 
 # =====================================================================
@@ -1678,13 +1702,19 @@ with tab_import:
     ir = result.import_
 
     # ── KPIs Schifffahrt ───────────────────────────────────────
+    st.info(
+        "**Preismodell:** Der Basispreis (A/B) ist der H₂-Preis **frei Importterminal** "
+        "– er enthält bereits Produktion, Seefracht, NH₃-Synthese und Reconversion (Cracking). "
+        "Der ausgewiesene Transport ist der **Lkw-Transport Hafen → Verbraucher**.",
+        icon="ℹ️",
+    )
     c1, c2, c3 = st.columns(3)
-    c1.metric("Seefracht-Transport",     f"{ir['transport_eur_kg']:.2f} €/kg",
-              f"{ir['distance_km']:.0f} km NH₃-Route")
+    c1.metric("🚚 Transport Hafen→Verbraucher", f"{ir['transport_eur_kg']:.2f} €/kg",
+              f"{ir['distance_km']:.0f} km Lkw (Tube-Trailer)")
     c2.metric("🚢 Import A (Markt)",     f"{ir['total_a_eur_kg']:.2f} €/kg",
-              f"Basis {ir['price_a']:.2f} €/kg")
+              f"Terminal {ir['price_a']:.2f} €/kg + Transport")
     c3.metric("🚢 Import B (de-risked)", f"{ir['total_b_eur_kg']:.2f} €/kg",
-              f"Basis {ir['price_b']:.2f} €/kg")
+              f"Terminal {ir['price_b']:.2f} €/kg + Transport")
 
     st.markdown("---")
 
@@ -1720,7 +1750,6 @@ with tab_import:
     st.markdown('<p class="section-heading">Kostenvergleich alle Versorgungsoptionen</p>',
                 unsafe_allow_html=True)
 
-    _spec = MODEL_PARAMETERS['specific_energy_nominal_kwh_per_kg'] * (1 + MODEL_PARAMETERS['aux_pct'] / 100)
     _cmp_labels, _cmp_vals, _cmp_cols, _cmp_grp = [], [], [], []
 
     # Eigenproduktion (Modell, alle Strategien)
