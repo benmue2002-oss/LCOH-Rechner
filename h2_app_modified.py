@@ -1799,11 +1799,11 @@ with tab_import:
         _cmp_cols.append('#3b82f6' if _sk == active_strategy else '#1e3a5f')
         _cmp_grp.append('Eigenproduktion')
 
-    # Schifffahrt
-    _cmp_labels += ['🚢 Import A (Markt)', '🚢 Import B (de-risked)']
-    _cmp_vals   += [round(ir['total_a_eur_kg'], 3), round(ir['total_b_eur_kg'], 3)]
-    _cmp_cols   += ['#f59e0b', '#d97706']
-    _cmp_grp    += ['Schifffahrt', 'Schifffahrt']
+    # Schifffahrt (Import B / de-risked existiert nicht mehr in h2_core – entfernt)
+    _cmp_labels += ['🚢 Import (Markt)']
+    _cmp_vals   += [round(ir['total_a_eur_kg'], 3)]
+    _cmp_cols   += ['#f59e0b']
+    _cmp_grp    += ['Schifffahrt']
 
     # Pipeline
     _cmp_labels.append(f"🔧 Pipeline Rotterdam ({pipe_dist} km)")
