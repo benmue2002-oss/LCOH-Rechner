@@ -356,7 +356,6 @@ class ImportInputs:
     distance_km: float = 450
     transport_ct_per_kg_km: float = 0.667
     price_a_eur_kg: float = 4.90   # Marktbasiert
-    price_b_eur_kg: float = 3.80   # staatlich abgesichert
 
 
 # =====================================================================
@@ -606,9 +605,7 @@ def compute_import(imp: ImportInputs) -> dict:
     return {
         'transport_eur_kg': transport,
         'total_a_eur_kg': imp.price_a_eur_kg + transport,
-        'total_b_eur_kg': imp.price_b_eur_kg + transport,
         'price_a': imp.price_a_eur_kg,
-        'price_b': imp.price_b_eur_kg,
         'distance_km': imp.distance_km,
     }
 
@@ -687,5 +684,4 @@ if __name__ == '__main__':
     for v in res.fleet:
         print(f"  {v['type']:30s} {v['tcoPkm']:.3f} €/km")
     print()
-    print(f"Import (Szenario A): {res.import_['total_a_eur_kg']:.2f} €/kg")
-    print(f"Import (Szenario B): {res.import_['total_b_eur_kg']:.2f} €/kg")
+    print(f"Import: {res.import_['total_a_eur_kg']:.2f} €/kg")
