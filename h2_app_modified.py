@@ -1584,6 +1584,71 @@ with tab_proc:
     st.markdown("---")
     pr = result.proc
 
+    # ── LCOH-Aufschlüsselung: gestapelter Balken ──────────────────
+    er = result.ely
+    _breakdown_cgh2 = [
+        ("Strom",        er.elec_kg,   '#38bdf8'),
+        ("ELY CAPEX",    er.capex_kg,  '#3b82f6'),
+        ("ELY OPEX",     er.opex_kg,   '#1d4ed8'),
+        ("Stack-Ersatz", er.stack_kg,  '#6366f1'),
+        ("Kompression",  pr.comp,      '#f59e0b'),
+        ("Speicher",     pr.stor,      '#f97316'),
+        ("Vertankung",   pr.disp,      '#10b981'),
+    ]
+    if proc.liq_on:
+        _breakdown_cgh2.append(("LH₂-Pfad", pr.lh2_total, '#34d399'))
+
+    _fig_bd = go.Figure()
+    for _name, _val, _col in _breakdown_cgh2:
+        _fig_bd.add_trace(go.Bar(
+            name=_name,
+            x=[_val],
+            y=["LCOH"],
+            orientation='h',
+            marker_color=_col,
+            marker_line_width=0,
+            text=f"{_val:.3f}",
+            textposition='inside',
+            insidetextanchor='middle',
+            textfont=dict(color='#f1f5f9', size=11, family='Inter'),
+            hovertemplate=f'<b>{_name}</b>: %{{x:.3f}} €/kg<extra></extra>',
+        ))
+    _fig_bd.update_layout(
+        barmode='stack',
+        height=90,
+        margin=dict(l=0, r=0, t=0, b=0),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(
+            title='€/kg H₂',
+            gridcolor='rgba(255,255,255,0.06)',
+            color='#6b7280',
+            tickfont=dict(size=10),
+        ),
+        yaxis=dict(showticklabels=False, gridcolor='rgba(0,0,0,0)'),
+        legend=dict(
+            bgcolor='rgba(17,24,39,0.9)',
+            bordercolor='rgba(255,255,255,0.07)',
+            borderwidth=1,
+            font=dict(color='#94a3b8', size=10, family='Inter'),
+            orientation='h',
+            y=-1.8, x=0.5, xanchor='center',
+        ),
+        font=dict(family='Inter', color='#94a3b8'),
+        hoverlabel=dict(bgcolor='#1e293b', bordercolor='#3b82f6', font_color='#f1f5f9'),
+        bargap=0.2,
+    )
+    _total_label = f"LCOH (CGH₂): {result.lcoh_total_cgh2:.3f} €/kg"
+    if proc.liq_on:
+        _total_label += f"  ·  LH₂: {result.lcoh_total_lh2:.3f} €/kg"
+    st.markdown(
+        f'<p style="font-size:0.68rem;font-weight:600;letter-spacing:0.07em;'
+        f'text-transform:uppercase;color:#4b5563;margin-bottom:6px;">'
+        f'LCOH-Aufschlüsselung &nbsp;·&nbsp; {_total_label}</p>',
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(_fig_bd, use_container_width=True)
+
     # ── Flowchart mit Kostenwerten (Zwei-Pfad) ──
     _ss2 = st.session_state.proc_step
 
