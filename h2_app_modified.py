@@ -870,7 +870,7 @@ with tab_proc:
     _sel = st.session_state.proc_step
 
     with st.expander("🔧 Kompression", expanded=(_sel == 'comp')):
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
             p1 = st.number_input("Eingangsdruck [bar]", 1.0, 100.0, 30.0, key="comp_p1")
             p2 = st.number_input("Ausgangsdruck [bar]", 50.0, 1000.0, 350.0, key="comp_p2")
@@ -881,6 +881,16 @@ with tab_proc:
             comp_opex = st.number_input("OPEX [%/a]", 0.5, 10.0, float(scn['compOPEX']), 0.5, key="comp_opex")
             comp_life = st.number_input("Lebensdauer [a]", 5, 30, int(scn['compLife']), key="comp_life")
             comp_loss = st.number_input("Verlust [%]", 0.0, 5.0, 1.0, 0.1, key="comp_loss")
+        with c4:
+            comp_util = st.number_input(
+                "Ziel-Auslastung Kompressor [%]", 30.0, 95.0, 70.0, 5.0,
+                key="comp_util",
+                help=(
+                    "Kompressor läuft entkoppelt vom ELY über den GH₂-Puffer @30 bar.\n\n"
+                    "Auslegung: ann_H₂ ÷ (8.760 h × Auslastung)\n"
+                    "70 % → ca. 6.130 h/a Betrieb"
+                ),
+            )
 
     with st.expander("📦 CGH₂-Speicher", expanded=(_sel == 'stor')):
         c1, c2, c3 = st.columns(3)
@@ -941,7 +951,7 @@ with tab_proc:
     proc = ProcInputs(
         p1_bar=p1, p2_bar=p2, comp_eta=comp_eta,
         comp_capex_eur_kgh=comp_capex, comp_opex_pct=comp_opex, comp_life_a=comp_life,
-        comp_loss_pct=comp_loss,
+        comp_loss_pct=comp_loss, comp_util_target_pct=comp_util,
         stor_days=stor_days, stor_capex_eur_kg=stor_capex, stor_opex_pct=stor_opex,
         stor_life_a=stor_life,
         gh2_buf_days=gh2_buf_days, gh2_buf_capex_eur_kg=gh2_buf_capex,
@@ -1603,7 +1613,7 @@ with tab_proc:
         <td rowspan="2" style="{_shared2}">
           <span style="font-size:1.25rem;">📦</span><br>
           <span style="font-size:0.68rem;font-weight:600;color:#94a3b8;">GH₂-Puffer</span><br>
-          <span style="font-size:0.75rem;color:#64748b;">{pr.mfr_kgh:.0f} kg/h</span>
+          <span style="font-size:0.75rem;color:#64748b;">{pr.mfr_ely_peak:.0f} kg/h</span>
         </td>
         <td rowspan="2" class="fb">─┬<br>&nbsp;└</td>
         {_rn('comp','🔧','Kompressor',f'{pr.comp:.3f} €/kg')}
@@ -1632,7 +1642,13 @@ with tab_proc:
     st.markdown("---")
     c1, c2, c3 = st.columns(3)
     c1.metric("Kompression", f"{pr.comp:.3f} €/kg",
-              f"{pr.comp_energy_kwh_kg:.2f} kWh/kg · {pr.mfr_kgh:.1f} kg/h")
+              f"{pr.comp_energy_kwh_kg:.2f} kWh/kg · Auslegung: {pr.mfr_kgh:.1f} kg/h")
+    st.caption(
+        f"Kompressor-Auslegung: **{pr.mfr_kgh:.1f} kg/h** "
+        f"({proc.comp_util_target_pct:.0f} % Zielauslastung · {8760 * proc.comp_util_target_pct / 100:.0f} h/a) · "
+        f"CAPEX-Anlage: **{pr.mfr_kgh * proc.comp_capex_eur_kgh / 1000:.0f} k€** · "
+        f"ELY-Nennstrom: {pr.mfr_ely_peak:.1f} kg/h"
+    )
     c2.metric("Speicher (CGH₂)", f"{pr.stor:.3f} €/kg")
     c3.metric("Vertankung", f"{pr.disp:.3f} €/kg")
 

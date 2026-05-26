@@ -297,6 +297,9 @@ class ProcInputs:
     comp_loss_pct: float = 1.0
     comp_mfr_auto: bool = True
     comp_mfr_manual: float = 25.0
+    # Kompressor-Auslastungsziel: läuft länger als ELY (über GH₂-Puffer @30 bar gepuffert)
+    # comp_mfr = ann_h2_kg / (8760 h × comp_util_pct/100)
+    comp_util_target_pct: float = 70.0
     # CGH₂-Speicher
     stor_days: float = 2.0
     stor_capex_eur_kg: float = 800
@@ -399,8 +402,9 @@ class ProcResult:
     lh2_total: float
     total_cgh2: float     # comp + stor + disp
     comp_energy_kwh_kg: float
-    mfr_kgh: float        # ELY-Nennmassenstrom (Kompressor-Auslegung)
-    liq_mfr_kgh: float    # Verflüssiger-Auslegungsmassenstrom (auf Auslastungsziel skaliert)
+    mfr_kgh: float          # Kompressor-Auslegungsmassenstrom (auf Auslastungsziel skaliert)
+    mfr_ely_peak: float     # ELY-Nennmassenstrom bei Vollast (Referenz)
+    liq_mfr_kgh: float      # Verflüssiger-Auslegungsmassenstrom (auf Auslastungsziel skaliert)
 
 
 # =====================================================================
@@ -483,8 +487,14 @@ def compute_proc_chain(proc: ProcInputs, ely_in: ElyInputs,
     LHV = 33.3  # kWh/kg H₂
 
     # ── Kompression ────────────────────────────────────────────────
-    mfr_calc = (ely_in.power_mw * 1000) / max(ely_in.specific_kwh_kg or 57, 1e-9)
-    mfr_kgh = mfr_calc if proc.comp_mfr_auto else proc.comp_mfr_manual
+    # ELY-Nennstrom (für Referenz / manuelle Überschreibung)
+    mfr_ely_peak = (ely_in.power_mw * 1000) / max(ely_in.specific_kwh_kg or 57, 1e-9)
+    if not proc.comp_mfr_auto:
+        mfr_kgh = proc.comp_mfr_manual
+    else:
+        # Kompressor läuft entkoppelt vom ELY (GH₂-Puffer @30 bar als Puffer).
+        # Auslegung auf Ziel-Auslastung → kleinere, besser ausgelastete Anlage.
+        mfr_kgh = ann_h / max(8760.0 * proc.comp_util_target_pct / 100.0, 1e-9)
 
     e_comp = h2_compress_kwh(proc.p1_bar, proc.p2_bar, proc.comp_eta)
     e_cost_c = e_comp * blended
@@ -562,7 +572,8 @@ def compute_proc_chain(proc: ProcInputs, ely_in: ElyInputs,
         liq=liq, gh2_buf_cgh2=gh2_buf_cgh2, gh2_buf_lh2=gh2_buf_lh2,
         lh2_stor=lh2_stor, lh2_disp=lh2_disp, lh2_total=lh2_total,
         total_cgh2=total_cgh2,
-        comp_energy_kwh_kg=e_comp, mfr_kgh=mfr_kgh, liq_mfr_kgh=liq_mfr_kgh,
+        comp_energy_kwh_kg=e_comp,
+        mfr_kgh=mfr_kgh, mfr_ely_peak=mfr_ely_peak, liq_mfr_kgh=liq_mfr_kgh,
     )
 
 
