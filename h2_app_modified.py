@@ -1491,7 +1491,8 @@ with tab_proc:
         <td rowspan="2" style="{_shared2}">
           <span style="font-size:1.25rem;">📦</span><br>
           <span style="font-size:0.68rem;font-weight:600;color:#94a3b8;">GH₂-Puffer</span><br>
-          <span style="font-size:0.75rem;color:#64748b;">{pr.mfr_ely_peak:.0f} kg/h</span>
+          <span style="font-size:0.75rem;color:#64748b;">{pr.mfr_ely_peak:.0f} kg/h Peak</span><br>
+          <span style="font-size:0.70rem;color:#4b5563;">{result.ely.ann_h2_kg/1000:.0f} t/a</span>
         </td>
         <td rowspan="2" class="fb">─┬<br>&nbsp;└</td>
         {_rn2('comp','🔧','Kompressor',f'{pr.comp:.3f} €/kg')}
