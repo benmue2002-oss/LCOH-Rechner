@@ -721,7 +721,7 @@ with tab_ely:
             ely_power = st.number_input("⚡ Leistung [MW]", 0.1, 500.0, 5.0, 0.5, key="ely_power")
             ely_flh   = st.number_input("⏱ Volllaststunden [h/a]", 500, 8760,
                                          int(strat['flh']), key="ely_flh")
-            ely_avail = st.number_input("✅ Verfügbarkeit [%]", 50.0, 100.0, 100.0, 1.0,
+            ely_avail = st.number_input("✅ Verfügbarkeit [%]", 50.0, 100.0, 95.0, 1.0,
                                          key="ely_avail")
             ely_aux   = st.number_input("🔌 Aux [%]", 0.0, 15.0, 3.0, 0.5,
                                          key="ely_aux")
@@ -741,8 +741,8 @@ with tab_ely:
                 )
             else:
                 ely_spec = st.number_input("🔋 Spez. Verbrauch [kWh/kg]", 40.0, 70.0,
-                                            52.0, 0.5, key="ely_spec")
-                ely_eta  = 64.0
+                                            57.0, 0.5, key="ely_spec")
+                ely_eta  = 58.0
                 _eta_disp = 33.33 / ely_spec * 100
                 st.caption(f"⇒ η LHV ≈ {_eta_disp:.1f} %")
 
@@ -778,11 +778,11 @@ with tab_ely:
                                          value=True, key="stack_replace")
             if stack_replace:
                 stack_h   = st.number_input("Stack-Lebensdauer [h]", 20_000, 200_000,
-                                             80_000, 5_000, key="stack_h")
+                                             60_000, 5_000, key="stack_h")
                 stack_pct = st.number_input("Ersatzkosten [% CAPEX]", 0.0, 60.0,
-                                             25.0, 5.0, key="stack_pct")
+                                             35.0, 5.0, key="stack_pct")
             else:
-                stack_h, stack_pct = 80_000, 25.0
+                stack_h, stack_pct = 60_000, 35.0
 
     ely = ElyInputs(
         power_mw=ely_power, capex_eur_kw=ely_capex, opex_pct=ely_opex,
@@ -912,7 +912,7 @@ with tab_proc:
             c1, c2, c3 = st.columns(3)
             with c1:
                 liq_sec = st.number_input("Spez. Strom Verflüssigung [kWh/kg]", 5.0, 20.0, float(scn['liqSEC']), key="liq_sec")
-                liq_capex = st.number_input("CAPEX Verflüssigung [€/(kg/h)]", 1_000, 50_000, int(scn['liqCAPEX']), key="liq_capex")
+                liq_capex = st.number_input("CAPEX Verflüssigung [€/(kg/h)]", 10_000, 500_000, int(scn['liqCAPEX']), 5_000, key="liq_capex")
             with c2:
                 liq_opex = st.number_input("OPEX Verflüssigung [%/a]", 1.0, 10.0, float(scn['liqOPEX']), key="liq_opex")
                 liq_life = st.number_input("Lebensdauer Verflüssigung [a]", 10, 30, int(scn['liqLife']), key="liq_life")
@@ -920,8 +920,8 @@ with tab_proc:
                 lh2_days = st.number_input("LH₂-Speichertage", 0.5, 15.0, float(scn['lh2Days']), key="lh2_days")
                 lh2_boiloff = st.number_input("Boil-off [%/Tag]", 0.01, 1.0, float(scn['lh2Boiloff']), 0.05, key="lh2_boiloff")
         else:
-            liq_sec = 12.0
-            liq_capex = scn.get('liqCAPEX', 8000)
+            liq_sec = 13.0
+            liq_capex = scn.get('liqCAPEX', 130_000)
             liq_opex = scn.get('liqOPEX', 4.0)
             liq_life = scn.get('liqLife', 22)
             lh2_days = scn.get('lh2Days', 0.5)

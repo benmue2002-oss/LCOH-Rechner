@@ -81,49 +81,56 @@ STRATEGY_PARAMS: dict[str, dict] = {
 SCENARIO_PARAMS: dict[str, dict] = {
     'konservativ': {
         'label': 'Konservativ',
-        'elyCAPEX': 1200, 'elyOPEX': 3.0, 'elyLife': 20, 'elyEta': 62, 'elyWACC': 7.0,
+        'elyCAPEX': 1400, 'elyOPEX': 3.0, 'elyLife': 20, 'elyEta': 54, 'elyWACC': 7.0,
         'compEta': 70, 'compCAPEX': 10000, 'compOPEX': 4.0, 'compLife': 12,
         'storCAPEX': 1100, 'storOPEX': 2.5, 'storLife': 20,
         'dispCAPEX': 600,  'dispUtil': 70,  'dispOPEX': 2.5, 'dispLife': 15,
-        'liqSEC': 13.0, 'liqCAPEX': 12000, 'liqOPEX': 5.0, 'liqLife': 20,
+        'liqSEC': 15.0, 'liqCAPEX': 160_000, 'liqOPEX': 5.0, 'liqLife': 20,
         'lh2Days': 0.5, 'lh2StorCAPEX': 500, 'lh2StorOPEX': 2.5, 'lh2StorLife': 25, 'lh2Boiloff': 0.05,
         'lh2DispCAPEX': 750, 'lh2DispUtil': 70, 'lh2DispOPEX': 3.5, 'lh2DispLife': 12,
     },
     'moderat': {
         'label': 'Moderat',
-        'elyCAPEX': 900,  'elyOPEX': 3.0, 'elyLife': 20, 'elyEta': 68, 'elyWACC': 7.0,
+        'elyCAPEX': 1000, 'elyOPEX': 3.0, 'elyLife': 20, 'elyEta': 58, 'elyWACC': 7.0,
         'compEta': 76, 'compCAPEX': 10000, 'compOPEX': 3.0, 'compLife': 15,
         'storCAPEX': 800, 'storOPEX': 2.0, 'storLife': 22,
         'dispCAPEX': 520, 'dispUtil': 80, 'dispOPEX': 2.5, 'dispLife': 15,
-        'liqSEC': 11.0, 'liqCAPEX': 8000, 'liqOPEX': 4.0, 'liqLife': 22,
+        'liqSEC': 13.0, 'liqCAPEX': 130_000, 'liqOPEX': 4.0, 'liqLife': 22,
         'gh2BufDays': 1.0, 'gh2BufCAPEX': 300, 'gh2BufOPEX': 2.0, 'gh2BufLife': 20,
         'lh2Days': 0.5, 'lh2StorCAPEX': 350, 'lh2StorOPEX': 2.0, 'lh2StorLife': 27, 'lh2Boiloff': 0.20,
         'lh2DispCAPEX': 560, 'lh2DispUtil': 80, 'lh2DispOPEX': 2.5, 'lh2DispLife': 15,
     },
     'optimistisch': {
         'label': 'Optimistisch',
-        'elyCAPEX': 600, 'elyOPEX': 2.0, 'elyLife': 25, 'elyEta': 74, 'elyWACC': 5.0,
+        'elyCAPEX': 600, 'elyOPEX': 2.0, 'elyLife': 25, 'elyEta': 65, 'elyWACC': 5.0,
         'compEta': 82, 'compCAPEX': 10000, 'compOPEX': 2.0, 'compLife': 20,
         'storCAPEX': 550, 'storOPEX': 1.5, 'storLife': 25,
         'dispCAPEX': 350, 'dispUtil': 90, 'dispOPEX': 1.5, 'dispLife': 18,
-        'liqSEC': 8.0, 'liqCAPEX': 5000, 'liqOPEX': 3.0, 'liqLife': 25,
+        'liqSEC': 10.0, 'liqCAPEX': 80_000, 'liqOPEX': 3.0, 'liqLife': 25,
         'lh2Days': 0.5, 'lh2StorCAPEX': 220, 'lh2StorOPEX': 1.5, 'lh2StorLife': 30, 'lh2Boiloff': 0.10,
         'lh2DispCAPEX': 380, 'lh2DispUtil': 90, 'lh2DispOPEX': 1.5, 'lh2DispLife': 18,
     },
 }
 
 ELY_PRESETS: dict[str, dict] = {
-    'Konservativ': {
-        'power_mw': 5, 'capex_eur_kw': 1200, 'opex_pct': 4.0,
-        'specific_kwh_kg': 56, 'flh': 3200, 'life_a': 15, 'wacc_pct': 9.0,
+    # PEM-spezifische Presets (Quelle: Fraunhofer ISE H2Giga, IEA, Hydrogen Council)
+    'PEM Konservativ': {
+        # Heute: CAPEX 1.200–1.500 €/kW, System-Level ~60–65 kWh/kg
+        'power_mw': 5, 'capex_eur_kw': 1400, 'opex_pct': 3.0,
+        'specific_kwh_kg': 62, 'flh': 3200, 'life_a': 20,
+        'wacc_pct': 9.0, 'stack_life_h': 50_000, 'stack_pct': 40.0,
     },
-    'Gemittelt': {
-        'power_mw': 5, 'capex_eur_kw': 900, 'opex_pct': 3.0,
-        'specific_kwh_kg': 52, 'flh': 4000, 'life_a': 20, 'wacc_pct': 7.0,
+    'PEM Moderat': {
+        # Nahe Term 2027–2030: CAPEX ~900–1.100 €/kW, System-Level ~55–58 kWh/kg
+        'power_mw': 5, 'capex_eur_kw': 1000, 'opex_pct': 3.0,
+        'specific_kwh_kg': 57, 'flh': 4000, 'life_a': 20,
+        'wacc_pct': 7.0, 'stack_life_h': 70_000, 'stack_pct': 35.0,
     },
-    'Optimistisch': {
-        'power_mw': 5, 'capex_eur_kw': 675, 'opex_pct': 2.0,
-        'specific_kwh_kg': 45, 'flh': 6500, 'life_a': 25, 'wacc_pct': 5.0,
+    'PEM Optimistisch': {
+        # Langfrist 2030+: CAPEX <600 €/kW (Hydrogen Council-Ziel), ~50–52 kWh/kg
+        'power_mw': 5, 'capex_eur_kw': 600, 'opex_pct': 2.0,
+        'specific_kwh_kg': 51, 'flh': 6500, 'life_a': 25,
+        'wacc_pct': 5.0, 'stack_life_h': 90_000, 'stack_pct': 30.0,
     },
 }
 
@@ -134,7 +141,7 @@ CUSTOM_DEFAULTS: dict = {
     'compEta': 76,        'compCAPEX': 10000, 'compOPEX': 3.0, 'compLife': 15,
     'storDays': 0.5,      'storCAPEX': 850,   'storOPEX': 2.0, 'storLife': 20,
     'dispCAPEX': 520,     'dispCap': 476,     'dispUtil': 80,  'dispOPEX': 2.5, 'dispLife': 15,
-    'liqSEC': 13.0,       'liqCAPEX': 9500,  'liqOPEX': 4.5,  'liqLife': 20,
+    'liqSEC': 13.0,       'liqCAPEX': 130_000, 'liqOPEX': 4.5,  'liqLife': 20,
     'lh2Days': 0.5,       'lh2StorCAPEX': 400, 'lh2StorOPEX': 2.0, 'lh2StorLife': 25,
     'lh2Boiloff': 0.20,
     'lh2DispCAPEX': 560,  'lh2DispUtil': 80, 'lh2DispOPEX': 2.5, 'lh2DispLife': 15,
@@ -260,21 +267,21 @@ class EEInputs:
 
 @dataclass
 class ElyInputs:
-    """Inputs für den Elektrolyseur."""
+    """Inputs für den Elektrolyseur (PEM-Auslegung)."""
     power_mw: float = 5.0
-    capex_eur_kw: float = 900.0
+    capex_eur_kw: float = 1000.0      # PEM moderat: 900–1.100 €/kW (2024–2027)
     opex_pct: float = 3.0
     avail_pct: float = 95.0
     aux_pct: float = 3.0
     flh: float = 4000
     life_a: float = 20
     wacc_pct: float = 7.0
-    stack_life_h: float = 80_000
+    stack_life_h: float = 60_000      # PEM: 50.000–80.000 h (kürzer als AEL)
     stack_replace: bool = True
-    stack_pct: float = 25.0
-    specific_kwh_kg: float = 55.0
+    stack_pct: float = 35.0           # PEM Stack-Ersatz: 30–40 % des CAPEX
+    specific_kwh_kg: float = 57.0     # PEM System-Level: ~55–62 kWh/kg (η_LHV ≈ 58 %)
     use_efficiency: bool = False
-    eta_lhv_pct: float = 68.0
+    eta_lhv_pct: float = 58.0         # PEM System-Level typisch: 55–62 % LHV
 
 
 @dataclass
@@ -308,8 +315,8 @@ class ProcInputs:
     disp_loss_pct: float = 2.0
     # Verflüssigung
     liq_on: bool = False
-    liq_sec_kwh_kg: float = 12.0
-    liq_capex_eur_kgh: float = 8_000
+    liq_sec_kwh_kg: float = 13.0
+    liq_capex_eur_kgh: float = 130_000
     liq_opex_pct: float = 4.0
     liq_life_a: float = 22
     liq_loss_pct: float = 1.0
