@@ -1666,11 +1666,14 @@ with tab_proc:
     c1, c2, c3 = st.columns(3)
     c1.metric("Kompression", f"{pr.comp:.3f} €/kg",
               f"{pr.comp_energy_kwh_kg:.2f} kWh/kg · Auslegung: {pr.mfr_kgh:.1f} kg/h")
+    _comp_util_eff = max(proc.comp_util_target_pct, result.ely.flh_eff / 8760 * 100)
     st.caption(
         f"Kompressor-Auslegung: **{pr.mfr_kgh:.1f} kg/h** "
-        f"({proc.comp_util_target_pct:.0f} % Zielauslastung · {8760 * proc.comp_util_target_pct / 100:.0f} h/a) · "
-        f"CAPEX-Anlage: **{pr.mfr_kgh * proc.comp_capex_eur_kgh / 1000:.0f} k€** · "
-        f"ELY-Nennstrom: {pr.mfr_ely_peak:.1f} kg/h"
+        f"({_comp_util_eff:.0f} % effekt. Auslastung · {8760 * _comp_util_eff / 100:.0f} h/a"
+        + (f" · ⚠️ Minimum wegen ELY-VLH {result.ely.flh_eff:.0f} h/a"
+           if _comp_util_eff > proc.comp_util_target_pct else "") +
+        f") · CAPEX-Anlage: **{pr.mfr_kgh * proc.comp_capex_eur_kgh / 1000:.0f} k€** · "
+        f"ELY-Nettostrom: {pr.mfr_ely_peak:.1f} kg/h"
     )
     c2.metric("Speicher (CGH₂)", f"{pr.stor:.3f} €/kg")
     c3.metric("Vertankung", f"{pr.disp:.3f} €/kg")
@@ -1682,11 +1685,14 @@ with tab_proc:
         c3.metric("LH₂-Vertankung", f"{pr.lh2_disp:.3f} €/kg")
         st.metric("LH₂-Pfad gesamt", f"{pr.lh2_total:.3f} €/kg")
         _liq_capex_total = pr.liq_mfr_kgh * proc.liq_capex_eur_kgh / 1_000_000
+        _liq_util_eff = max(proc.liq_util_target_pct, result.ely.flh_eff / 8760 * 100)
         st.caption(
             f"Verflüssiger-Auslegung: **{pr.liq_mfr_kgh:.1f} kg/h** "
-            f"({proc.liq_util_target_pct:.0f} % Zielauslastung · {8760 * proc.liq_util_target_pct / 100:.0f} h/a) · "
-            f"CAPEX-Anlage: **{_liq_capex_total:.2f} Mio. €** · "
-            f"ELY-Nennstrom zum Vergleich: {pr.mfr_kgh:.1f} kg/h"
+            f"({_liq_util_eff:.0f} % effekt. Auslastung · {8760 * _liq_util_eff / 100:.0f} h/a"
+            + (f" · ⚠️ Minimum wegen ELY-VLH {result.ely.flh_eff:.0f} h/a"
+               if _liq_util_eff > proc.liq_util_target_pct else "") +
+            f") · CAPEX-Anlage: **{_liq_capex_total:.2f} Mio. €** · "
+            f"ELY-Nettostrom: {pr.mfr_ely_peak:.1f} kg/h"
         )
 
 

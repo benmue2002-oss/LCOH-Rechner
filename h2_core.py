@@ -486,14 +486,18 @@ def compute_proc_chain(proc: ProcInputs, ely_in: ElyInputs,
     LHV = 33.3  # kWh/kg H₂
 
     # ── Kompression ────────────────────────────────────────────────
-    # ELY-Nennstrom (für Referenz / manuelle Überschreibung)
-    mfr_ely_peak = (ely_in.power_mw * 1000) / max(ely_in.specific_kwh_kg or 57, 1e-9)
+    # ELY-Nettostrom: ann_h2 / flh_eff — konsistent mit ann_h (inkl. Hilfsstrom).
+    # Physikalische Untergrenze: Kompressor kann nicht weniger Stunden laufen als
+    # der ELY produziert (sonst mfr_kgh > ELY-Peak, unrealistisch ohne Riesenpuffer).
+    mfr_ely_peak = ely.ann_h2_kg / max(ely.flh_eff, 1e-9)
+    ely_cap_factor_pct = ely.flh_eff / 8760.0 * 100.0
     if not proc.comp_mfr_auto:
         mfr_kgh = proc.comp_mfr_manual
     else:
         # Kompressor läuft entkoppelt vom ELY (GH₂-Puffer @30 bar als Puffer).
-        # Auslegung auf Ziel-Auslastung → kleinere, besser ausgelastete Anlage.
-        mfr_kgh = ann_h / max(8760.0 * proc.comp_util_target_pct / 100.0, 1e-9)
+        # Ziel-Auslastung mind. = ELY-Kapazitätsfaktor, damit mfr_kgh ≤ mfr_ely_peak.
+        comp_util_eff = max(proc.comp_util_target_pct, ely_cap_factor_pct)
+        mfr_kgh = ann_h / max(8760.0 * comp_util_eff / 100.0, 1e-9)
 
     e_comp = h2_compress_kwh(proc.p1_bar, proc.p2_bar, proc.comp_eta)
     e_cost_c = e_comp * blended
@@ -525,10 +529,10 @@ def compute_proc_chain(proc: ProcInputs, ely_in: ElyInputs,
     gh2_buf_total = (gh2_buf_ann_cap + gh2_buf_ann_op) / max(ann_h, 1e-9)
 
     # ── Verflüssigung ──────────────────────────────────────────────
-    # Verflüssiger läuft entkoppelt vom ELY (GH₂-Puffer dazwischen).
-    # Auslegung nach Ziel-Auslastung: liq_mfr = ann_h2 / (8760 h × util_target)
-    # → kleinere, besser ausgelastete Anlage bei niedrigen ELY-FLH.
-    liq_mfr_kgh = ann_h / max(8760.0 * proc.liq_util_target_pct / 100.0, 1e-9)
+    # Gleiche Logik wie Kompressor: Ziel-Auslastung mind. = ELY-Kapazitätsfaktor,
+    # damit liq_mfr_kgh ≤ mfr_ely_peak.
+    liq_util_eff = max(proc.liq_util_target_pct, ely_cap_factor_pct)
+    liq_mfr_kgh = ann_h / max(8760.0 * liq_util_eff / 100.0, 1e-9)
     e_l = proc.liq_sec_kwh_kg * blended
     ann_cap_l = (liq_mfr_kgh * proc.liq_capex_eur_kgh) * crf(wacc, proc.liq_life_a)
     ann_opx_l = (liq_mfr_kgh * proc.liq_capex_eur_kgh) * (proc.liq_opex_pct / 100)
